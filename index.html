@@ -261,8 +261,8 @@
       const todos = load();
       todos.push({ id: Date.now(), title, completed: false });
       save(todos);
-      input.value = '';
       render();
+      input.value = '';
     }
 
     function toggleTodo(id) {
@@ -351,7 +351,10 @@
     }
 
     document.getElementById('new-todo').addEventListener('keydown', e => {
-      if (e.key === 'Enter') addTodo();
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addTodo();
+      }
     });
 
     render();
