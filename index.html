@@ -49,7 +49,6 @@
       overflow: hidden;
     }
 
-    /* Input */
     .input-row {
       display: flex;
       padding: 20px;
@@ -86,7 +85,6 @@
 
     .btn-add:hover { background: var(--primary-hover); }
 
-    /* Filters */
     .filters {
       display: flex;
       gap: 4px;
@@ -109,7 +107,6 @@
     .filter-btn:hover { background: var(--bg); color: var(--text); }
     .filter-btn.active { background: var(--primary); color: white; }
 
-    /* List */
     #todo-list { list-style: none; }
 
     .todo-item {
@@ -119,13 +116,11 @@
       gap: 12px;
       border-bottom: 1px solid var(--border);
       transition: background 0.15s;
-      position: relative;
     }
 
     .todo-item:last-child { border-bottom: none; }
     .todo-item:hover { background: #fafafa; }
 
-    /* Checkbox */
     .todo-item input[type="checkbox"] {
       appearance: none;
       width: 20px;
@@ -154,7 +149,6 @@
       font-weight: 700;
     }
 
-    /* Label */
     .todo-label {
       flex: 1;
       font-size: 15px;
@@ -168,7 +162,6 @@
       color: var(--completed-text);
     }
 
-    /* Edit input */
     .todo-edit {
       flex: 1;
       border: 1.5px solid var(--primary);
@@ -179,7 +172,6 @@
       outline: none;
     }
 
-    /* Delete button */
     .btn-delete {
       background: none;
       border: none;
@@ -197,7 +189,6 @@
     .todo-item:hover .btn-delete { opacity: 1; }
     .btn-delete:hover { background: #fee2e2; color: var(--danger); }
 
-    /* Empty state */
     .empty {
       padding: 48px 20px;
       text-align: center;
@@ -205,7 +196,6 @@
       font-size: 15px;
     }
 
-    /* Footer */
     .footer {
       display: flex;
       justify-content: space-between;
@@ -252,58 +242,52 @@
   </div>
 
   <script>
-    let todos = [];
+    const STORAGE_KEY = 'todos';
     let filter = 'all';
     let editingId = null;
 
-    async function fetchTodos() {
-      const res = await fetch('/api/todos');
-      todos = await res.json();
-      render();
+    function load() {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
     }
 
-    async function addTodo() {
+    function save(todos) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
+    }
+
+    function addTodo() {
       const input = document.getElementById('new-todo');
       const title = input.value.trim();
       if (!title) return;
-      await fetch('/api/todos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title })
-      });
+      const todos = load();
+      todos.push({ id: Date.now(), title, completed: false });
+      save(todos);
       input.value = '';
-      fetchTodos();
+      render();
     }
 
-    async function toggleTodo(id, completed) {
-      await fetch(`/api/todos/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ completed: completed ? 0 : 1 })
-      });
-      fetchTodos();
+    function toggleTodo(id) {
+      const todos = load().map(t => t.id === id ? { ...t, completed: !t.completed } : t);
+      save(todos);
+      render();
     }
 
-    async function deleteTodo(id) {
-      await fetch(`/api/todos/${id}`, { method: 'DELETE' });
-      fetchTodos();
+    function deleteTodo(id) {
+      save(load().filter(t => t.id !== id));
+      render();
     }
 
-    async function saveEdit(id, title) {
+    function saveEdit(id, title) {
       const trimmed = title.trim();
-      if (!trimmed) { fetchTodos(); return; }
-      await fetch(`/api/todos/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: trimmed })
-      });
+      if (!trimmed) { editingId = null; render(); return; }
+      const todos = load().map(t => t.id === id ? { ...t, title: trimmed } : t);
+      save(todos);
       editingId = null;
-      fetchTodos();
+      render();
     }
 
-    async function clearCompleted() {
-      await fetch('/api/todos/completed', { method: 'DELETE' });
-      fetchTodos();
+    function clearCompleted() {
+      save(load().filter(t => !t.completed));
+      render();
     }
 
     function setFilter(f) {
@@ -314,14 +298,19 @@
       render();
     }
 
+    function escHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
     function render() {
-      const list = document.getElementById('todo-list');
+      const todos = load();
       const filtered = todos.filter(t => {
         if (filter === 'active') return !t.completed;
         if (filter === 'completed') return t.completed;
         return true;
       });
 
+      const list = document.getElementById('todo-list');
       if (filtered.length === 0) {
         list.innerHTML = `<div class="empty">タスクがありません</div>`;
       } else {
@@ -329,7 +318,7 @@
           if (editingId === t.id) {
             return `
               <li class="todo-item" data-id="${t.id}">
-                <input type="checkbox" ${t.completed ? 'checked' : ''} onclick="toggleTodo(${t.id}, ${t.completed})">
+                <input type="checkbox" ${t.completed ? 'checked' : ''} onclick="toggleTodo(${t.id})">
                 <input class="todo-edit" id="edit-${t.id}" type="text" value="${escHtml(t.title)}"
                   onblur="saveEdit(${t.id}, this.value)"
                   onkeydown="if(event.key==='Enter') saveEdit(${t.id}, this.value); if(event.key==='Escape'){editingId=null;render();}">
@@ -338,7 +327,7 @@
           }
           return `
             <li class="todo-item ${t.completed ? 'completed' : ''}" data-id="${t.id}">
-              <input type="checkbox" ${t.completed ? 'checked' : ''} onclick="toggleTodo(${t.id}, ${t.completed})">
+              <input type="checkbox" ${t.completed ? 'checked' : ''} onclick="toggleTodo(${t.id})">
               <span class="todo-label" ondblclick="startEdit(${t.id})">${escHtml(t.title)}</span>
               <button class="btn-delete" onclick="deleteTodo(${t.id})">×</button>
             </li>`;
@@ -361,15 +350,11 @@
       render();
     }
 
-    function escHtml(str) {
-      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
-
     document.getElementById('new-todo').addEventListener('keydown', e => {
       if (e.key === 'Enter') addTodo();
     });
 
-    fetchTodos();
+    render();
   </script>
 </body>
 </html>
