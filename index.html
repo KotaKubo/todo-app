@@ -262,7 +262,10 @@
       todos.push({ id: Date.now(), title, completed: false });
       save(todos);
       render();
-      input.value = '';
+      requestAnimationFrame(() => {
+        input.value = '';
+        input.focus();
+      });
     }
 
     function toggleTodo(id) {
